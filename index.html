@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>TCG - Timer Pro</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <canvas id="topoCanvas"></canvas>
+
+    <div id="timer-container">
+        <div id="timer">35:00</div>
+    </div>
+
+    <img id="tbc-image" src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/To_Be_Continued_Logo.svg/1024px-To_Be_Continued_Logo.svg.png" alt="To Be Continued">
+
+    <div id="hover-zone">
+        <div id="controls">
+            <div class="control-group">
+                <input type="number" id="time-input" value="35" min="1" max="300">
+                <span class="min-label">min</span>
+                <button id="btn-apply" onclick="applyTime()">✔ Aplicar</button>
+            </div>
+            <div class="control-group">
+                <button onclick="startTimer()">▶ Iniciar</button>
+                <button onclick="pauseTimer()">⏸ Pausa</button>
+                <button id="btn-reset" onclick="resetTimer()">🔄 Reiniciar</button>
+            </div>
+            <div class="control-group">
+                <button id="btn-fullscreen" onclick="toggleFullScreen()">⛶ Pantalla</button>
+                <button id="btn-settings" onclick="openSettings()">⚙️ Config</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-overlay" onclick="closeSettings()"></div>
+    <div id="settings-modal">
+        <h2>⚙️ Personalización</h2>
+        
+        <div class="setting-row">
+            <label>Estilo del Reloj:</label>
+            <select id="theme-select" onchange="changeTheme()">
+                <option value="memphis">Memphis 3D</option>
+                <option value="puntos" selected>Puntos Manga</option>
+                <option value="logo">Logo Panda</option>
+                <option value="logo2">Logo One Piece</option>
+                <option value="logo3">Logo Konoha</option> 
+            </select>
+        </div>
+
+        <div class="setting-row" id="logo-style-row">
+            <label>Animación Logos:</label>
+            <select id="logo-style-select" onchange="changeTheme()">
+                <option value="grid" selected>Cuadrícula Básica (Defecto)</option>
+                <option value="smooth">Deslizamiento Suave</option>
+                <option value="chaotic">Mosaico</option>
+            </select>
+        </div>
+
+        <div class="setting-row">
+            <label>Fondo de Pantalla:</label>
+            <select id="bg-select" onchange="changeBackground()">
+                <option value="topografico">Topográfico</option>
+                <option value="negro">Negro Puro</option>
+            </select>
+        </div>
+
+        <div class="setting-row" id="topo-slider-row">
+            <label>Grosor Topográfico:</label>
+            <input type="range" id="topo-thickness" min="0.5" max="6" step="0.5" value="2.5" oninput="updateTopoThickness()">
+        </div>
+
+        <button id="btn-close-settings" onclick="closeSettings()">✔ Aceptar</button>
+    </div>
+
+    <audio id="audio-warning" src="alarma.mp3"></audio>
+    <audio id="audio-end" src="final.mp3"></audio>
+
+    <script>
+        let currentTotalSeconds = 35 * 60; 
+        let timeLeft = currentTotalSeconds; 
+        let timerInterval;
+        let isRunning = false;
+        let warningTriggered = false;
+
+        const timerDisplay = document.getElementById('timer');
+        const timerContainer = document.getElementById('timer-container');
+        const tbcImage = document.getElementById('tbc-image');
+        const audioWarning = document.getElementById('audio-warning');
+        const audioEnd = document.getElementById('audio-end');
+        const timeInput = document.getElementById('time-input');
+        const themeSelect = document.getElementById('theme-select');
+        const bgSelect = document.getElementById('bg-select');
+        const logoStyleSelect = document.getElementById('logo-style-select');
+        
+        let currentTopoThickness = 2.5;
+
+        function openSettings() {
+            document.getElementById('settings-overlay').style.display = 'block';
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-overlay').style.display = 'none';
+            document.getElementById('settings-modal').style.display = 'none';
+        }
+
+        const canvas = document.getElementById('topoCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let topoTime = 0;
+        const lineCount = 15;
+        const step = 25; 
+        const speed = 0.005;
+        let isTopoRunning = true; 
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        function noise(x, y, t) {
+            return Math.sin(x * 0.002 + t) * Math.cos(y * 0.002 - t) +
+                   Math.sin(x * 0.005 + y * 0.002 + t * 0.5) * 0.5;
+        }
+
+        function updateTopoThickness() {
+            currentTopoThickness = parseFloat(document.getElementById('topo-thickness').value);
+        }
+
+        function drawTopo() {
+            if (!isTopoRunning) return; 
+            ctx.clearRect(0, 0, width, height);
+
+            if (timeLeft <= 300 && timeLeft > 0) {
+                ctx.strokeStyle = 'rgba(255, 51, 51, 0.4)'; 
+                topoTime += speed * 3; 
+            } else {
+                ctx.strokeStyle = 'rgba(68, 156, 118, 0.3)'; 
+                topoTime += speed;
+            }
+
+            ctx.lineWidth = currentTopoThickness;
+            ctx.lineCap = 'round'; 
+
+            for (let i = 0; i < lineCount; i++) {
+                const threshold = (i / lineCount) * 2 - 1; 
+                ctx.beginPath();
+                for (let x = 0; x < width; x += step) {
+                    for (let y = 0; y < height; y += step) {
+                        const val = noise(x, y, topoTime);
+                        if (Math.abs(val - threshold) < 0.1) {
+                            ctx.moveTo(x, y);
+                            ctx.lineTo(x + 2, y + 2);
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+            requestAnimationFrame(drawTopo);
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function changeBackground() {
+            const sliderRow = document.getElementById('topo-slider-row');
+            if (bgSelect.value === 'negro') {
+                canvas.style.display = 'none';
+                isTopoRunning = false; 
+                sliderRow.style.opacity = '0.3'; 
+                document.getElementById('topo-thickness').disabled = true;
+            } else {
+                canvas.style.display = 'block';
+                sliderRow.style.opacity = '1';
+                document.getElementById('topo-thickness').disabled = false;
+                if (!isTopoRunning) {
+                    isTopoRunning = true;
+                    drawTopo(); 
+                }
+            }
+        }
+
+        function updateDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (timeLeft <= 300 && timeLeft > 0) {
+                timerContainer.classList.add('warning-container');
+                timerDisplay.classList.add('warning-text');
+                
+                if (timeLeft === 300 && !warningTriggered) {
+                    audioWarning.play().catch(e => console.log("Falta alarma.mp3"));
+                    warningTriggered = true;
+                }
+            } else {
+                timerContainer.classList.remove('warning-container');
+                timerDisplay.classList.remove('warning-text');
+            }
+
+            if (timeLeft <= 10 && timeLeft > 0) {
+                timerContainer.classList.add('dramatic-vibe');
+            } else {
+                timerContainer.classList.remove('dramatic-vibe');
+            }
+
+            if (timeLeft === 0) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                tbcImage.style.display = 'block'; 
+                timerContainer.classList.remove('dramatic-vibe'); 
+                audioEnd.play().catch(e => console.log("Falta final.mp3"));
+            }
+        }
+
+        function getDir() {
+            let d = 0;
+            while(d === 0) d = Math.floor(Math.random() * 3) - 1;
+            return d;
+        }
+
+        function setRandomMovementDirection() {
+            const currentTheme = themeSelect.value;
+
+            if (currentTheme === 'memphis') {
+                let mx_base = getDir(), my_base = getDir();
+                document.documentElement.style.setProperty('--move-x-base', (mx_base * 150) + 'px');
+                document.documentElement.style.setProperty('--move-y-base', (my_base * 150) + 'px');
+
+                let mx_overlay = 0, my_overlay = 0;
+                while ((mx_overlay === 0 && my_overlay === 0) || (mx_overlay === mx_base && my_overlay === my_base)) { 
+                    mx_overlay = getDir(); my_overlay = getDir();
+                }
+                document.documentElement.style.setProperty('--move-x-overlay', (mx_overlay * 600) + 'px');
+                document.documentElement.style.setProperty('--move-y-overlay', (my_overlay * 600) + 'px');
+
+            } else if (currentTheme === 'puntos') {
+                document.documentElement.style.setProperty('--move-x-puntos', (getDir() * 20) + 'px');
+                document.documentElement.style.setProperty('--move-y-puntos', (getDir() * 20) + 'px');
+                
+            } else if (currentTheme.startsWith('logo')) {
+                const logoStyle = logoStyleSelect.value;
+
+                if (logoStyle === 'grid') {
+                    let m_x = getDir(), m_y = getDir();
+                    document.documentElement.style.setProperty('--move-x-logo', (m_x * 240) + 'px'); 
+                    document.documentElement.style.setProperty('--move-y-logo', (m_y * 240) + 'px');
+
+                } else if (logoStyle === 'smooth') {
+                    let directionX = getDir(), directionY = getDir();
+                    document.documentElement.style.setProperty('--move-x-logo-back', (directionX * 80) + 'px');
+                    document.documentElement.style.setProperty('--move-y-logo-back', (directionY * 80) + 'px');
+                    document.documentElement.style.setProperty('--move-x-logo-front', (directionX * 300) + 'px');
+                    document.documentElement.style.setProperty('--move-y-logo-front', (directionY * 300) + 'px');
+
+                } else if (logoStyle === 'chaotic') {
+                    let d1x = getDir(), d1y = getDir();
+                    document.documentElement.style.setProperty('--mx-logo-1', (d1x * 320) + 'px');
+                    document.documentElement.style.setProperty('--my-logo-1', (d1y * 320) + 'px');
+
+                    let d2x = 0, d2y = 0;
+                    while ((d2x === 0 && d2y === 0) || (d2x === d1x && d2y === d1y)) { d2x = getDir(); d2y = getDir(); }
+                    document.documentElement.style.setProperty('--mx-logo-2', (d2x * 240) + 'px');
+                    document.documentElement.style.setProperty('--my-logo-2', (d2y * 240) + 'px');
+
+                    let d3x = 0, d3y = 0;
+                    while ((d3x === 0 && d3y === 0) || (d3x === d2x && d3y === d2y)) { d3x = getDir(); d3y = getDir(); }
+                    document.documentElement.style.setProperty('--mx-logo-3', (d3x * 200) + 'px');
+                    document.documentElement.style.setProperty('--my-logo-3', (d3y * 200) + 'px');
+                }
+            }
+        }
+
+        function changeTheme() {
+            timerDisplay.classList.remove('theme-memphis', 'theme-puntos', 'theme-logo', 'theme-logo2', 'theme-logo3', 'style-grid', 'style-chaotic', 'style-smooth');
+            timerDisplay.classList.add('theme-' + themeSelect.value);
+
+            const logoStyleRow = document.getElementById('logo-style-row');
+            if (themeSelect.value.startsWith('logo')) {
+                logoStyleRow.style.opacity = '1';
+                logoStyleSelect.disabled = false;
+                timerDisplay.classList.add('style-' + logoStyleSelect.value);
+            } else {
+                logoStyleRow.style.opacity = '0.3';
+                logoStyleSelect.disabled = true;
+            }
+
+            setRandomMovementDirection();
+        }
+
+        function applyTime() {
+            let newMinutes = parseInt(timeInput.value);
+            if (isNaN(newMinutes) || newMinutes <= 0) {
+                alert("Por favor, introduce un número válido de minutos.");
+                return;
+            }
+            currentTotalSeconds = newMinutes * 60;
+            setRandomMovementDirection();
+            resetTimer(); 
+        }
+
+        function startTimer() {
+            if (isRunning || timeLeft === 0) return;
+            isRunning = true;
+            tbcImage.style.display = 'none';
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateDisplay();
+            }, 1000);
+        }
+
+        function pauseTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            pauseTimer();
+            timeLeft = currentTotalSeconds;
+            warningTriggered = false;
+            tbcImage.style.display = 'none';
+            setRandomMovementDirection();
+            updateDisplay();
+        }
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Error: Haz clic en la pantalla antes de usar este botón. Detalles: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        let mouseTimeout;
+        document.onmousemove = function() {
+            document.body.style.cursor = 'default';
+            clearTimeout(mouseTimeout);
+            mouseTimeout = setTimeout(function() {
+                document.body.style.cursor = 'none';
+            }, 2500);
+        };
+
+        // INICIALIZACIÓN
+        changeTheme(); 
+        changeBackground(); 
+        updateDisplay(); 
+        drawTopo(); 
+    </script>
+</body>
+</html>
