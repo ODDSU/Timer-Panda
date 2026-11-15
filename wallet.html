@@ -129,6 +129,20 @@
         .mov-monto.positivo { color: #34d399; }
         .mov-monto.negativo { color: #fca5a5; }
 
+        /* CADUCIDAD (discreta) */
+        .mov-icon.caducado { background: rgba(148, 163, 184, 0.12); }
+        .mov-monto.caducado { color: var(--text-muted); }
+        .mov-caduca { font-weight: 600; opacity: 0.75; }
+        .mov-caduca.pronto, .balance-expiry.pronto { color: #fbbf24; opacity: 1; }
+        .balance-expiry {
+            font-size: 0.75rem; color: var(--text-muted); font-weight: 600;
+            margin-top: 12px; letter-spacing: 0.3px;
+        }
+        .stat-card .stat-sub {
+            font-size: 0.68rem; color: var(--text-muted); font-weight: 600;
+            margin-top: 6px; opacity: 0.8;
+        }
+
         /* ESTADO VACÍO / ERROR / CARGA */
         .state-message {
             text-align: center; padding: 60px 20px;
@@ -149,7 +163,14 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* BOTÓN VOLVER */
-        
+        .back-link {
+            display: inline-flex; align-items: center; gap: 8px;
+            color: var(--text-muted); text-decoration: none; font-weight: 600;
+            font-size: 0.85rem; margin-bottom: 20px; padding: 8px 16px;
+            background: rgba(0,0,0,0.3); border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05); transition: 0.2s;
+        }
+        .back-link:hover { color: white; background: rgba(255,255,255,0.05); transform: translateX(-3px); }
 
         /* FILTRO */
         .filter-row {
@@ -217,7 +238,6 @@
     </div>
 
     <div class="wallet-container">
-      
         <div class="wallet-header">
             <h1>💰 PANDA WALLET</h1>
             <p class="subtitle">Pool de Premios Commander</p>
@@ -286,16 +306,28 @@
         // Calcular totales
         let totalIngresos = 0;
         let totalGastos = 0;
+        let totalCaducado = 0;
 
         movimientos.forEach(m => {
-            if (m.tipo === 'ingreso' || m.tipo === 'premio') {
+            if (esIngreso(m.tipo)) {
                 totalIngresos += m.monto;
-            } else if (m.tipo === 'gasto' || m.tipo === 'canje' || m.tipo === 'canjeo') {
+            } else if (esGasto(m.tipo)) {
                 totalGastos += m.monto;
+            } else if (m.tipo === 'caducado') {
+                totalCaducado += m.monto;
             }
         });
 
-        const saldo = totalIngresos - totalGastos;
+        const saldo = totalIngresos - totalGastos - totalCaducado;
+
+        // El saldo que antes caduca (los premios ya vienen con su fecha de caducidad)
+        const proximo = movimientos
+            .filter(m => m.caduca && m.restante > 0)
+            .sort((a, b) => new Date(a.caduca) - new Date(b.caduca))[0];
+        const avisoCaducidad = proximo ? `
+                <div class="balance-expiry ${diasHasta(proximo.caduca) <= 30 ? 'pronto' : ''}">
+                    ⏳ ${proximo.restante.toFixed(2)}€ de tu saldo caducan el ${formatearFecha(proximo.caduca)}
+                </div>` : '';
 
         // Ordenar por fecha (más reciente primero)
         movimientos.sort((a, b) => {
@@ -310,7 +342,7 @@
             <div class="balance-card">
                 <div class="balance-label">Saldo disponible</div>
                 <div class="balance-amount">${saldo.toFixed(2)}€</div>
-                <div class="balance-name">👤 ${escapeHTML(nombre)}</div>
+                <div class="balance-name">👤 ${escapeHTML(nombre)}</div>${avisoCaducidad}
             </div>
 
             <!-- STATS -->
@@ -324,6 +356,7 @@
                     <div class="stat-icon">🛒</div>
                     <div class="stat-value">-${totalGastos.toFixed(2)}€</div>
                     <div class="stat-label">Total gastado</div>
+                    ${totalCaducado > 0 ? `<div class="stat-sub">⏳ ${totalCaducado.toFixed(2)}€ caducados</div>` : ''}
                 </div>
             </div>
 
@@ -351,8 +384,8 @@
         const filtered = filtro === 'todos'
             ? movimientos
             : movimientos.filter(m => {
-                if (filtro === 'ingreso') return m.tipo === 'ingreso' || m.tipo === 'premio';
-                if (filtro === 'gasto') return m.tipo === 'gasto' || m.tipo === 'canje' || m.tipo === 'canjeo';
+                if (filtro === 'ingreso') return esIngreso(m.tipo);
+                if (filtro === 'gasto') return esGasto(m.tipo) || m.tipo === 'caducado';
                 return true;
             });
 
@@ -366,19 +399,30 @@
         }
 
         return filtered.map(m => {
-            const esIngreso = m.tipo === 'ingreso' || m.tipo === 'premio';
-            const iconClass = esIngreso ? 'ingreso' : 'gasto';
-            const icon = esIngreso ? '💰' : '🛒';
-            const montoClass = esIngreso ? 'positivo' : 'negativo';
-            const montoPrefix = esIngreso ? '+' : '-';
+            const ingreso = esIngreso(m.tipo);
+            const caducado = m.tipo === 'caducado';
+            const iconClass = ingreso ? 'ingreso' : caducado ? 'caducado' : 'gasto';
+            const icon = ingreso ? '💰' : caducado ? '⏳' : '🛒';
+            const montoClass = ingreso ? 'positivo' : caducado ? 'caducado' : 'negativo';
+            const montoPrefix = ingreso ? '+' : '-';
             const fechaFormateada = formatearFecha(m.fecha);
+
+            // Premio con saldo vivo: cuánto queda y hasta cuándo
+            let caduca = '';
+            if (m.caduca && m.restante > 0) {
+                const texto = m.restante < m.monto
+                    ? `te quedan ${m.restante.toFixed(2)}€, caducan el ${formatearFecha(m.caduca)}`
+                    : `caduca el ${formatearFecha(m.caduca)}`;
+                const pronto = diasHasta(m.caduca) <= 30 ? 'pronto' : '';
+                caduca = ` · <span class="mov-caduca ${pronto}">${texto}</span>`;
+            }
 
             return `
                 <div class="movement" data-tipo="${m.tipo}">
                     <div class="mov-icon ${iconClass}">${icon}</div>
                     <div class="mov-info">
                         <div class="mov-concepto">${escapeHTML(m.concepto)}</div>
-                        <div class="mov-fecha">${fechaFormateada}</div>
+                        <div class="mov-fecha">${fechaFormateada}${caduca}</div>
                     </div>
                     <div class="mov-monto ${montoClass}">${montoPrefix}${m.monto.toFixed(2)}€</div>
                 </div>
@@ -394,6 +438,15 @@
         // Re-renderizar
         const list = document.getElementById('movements-list');
         list.innerHTML = renderMovimientos(window._movimientos, tipo);
+    }
+
+    function esIngreso(tipo) { return tipo === 'ingreso' || tipo === 'premio'; }
+    function esGasto(tipo) { return tipo === 'gasto' || tipo === 'canje' || tipo === 'canjeo'; }
+
+    function diasHasta(fechaStr) {
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        return Math.round((new Date(fechaStr) - hoy) / 86400000);
     }
 
     function formatearFecha(fechaStr) {
@@ -443,7 +496,7 @@
 
                 <div class="step" style="border-color: var(--accent);">
                     <div class="step-number" style="color: var(--accent);">¡Listo!</div>
-                    <p>Genera los links desde <strong style="color: white;">wallet-admin</strong>. Tendrán este formato:<br>
+                    <p>Copia los links desde el <strong style="color: white;">panel de la tienda</strong>. Tendrán este formato:<br>
                     <code>tu-web.github.io/wallet.html?t=<span style="color: #34d399;">token_secreto</span></code></p>
                 </div>
             </div>
@@ -499,5 +552,4 @@
     </script>
 
 </body>
-</html>
 </html>
