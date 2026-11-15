@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>🐼 Mi carné Panda</title>
+    <meta name="theme-color" content="#0b0b10">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Carné Panda">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" type="image/png" href="logo1.png">
+    <link rel="apple-touch-icon" href="logo1.png">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+    <style>
+        /* =========================================
+           CARNÉ DIGITAL DEL CLIENTE (misma estética que el wallet)
+           ========================================= */
+        body {
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; margin: 0; padding: 20px 16px 40px; max-width: 100%;
+            overflow-x: hidden; overflow-y: auto;
+            background-color: var(--bg-dark); box-sizing: border-box;
+        }
+        .wrap { width: 100%; max-width: 520px; animation: fadeUp 0.6s ease-out backwards; }
+
+        .cab { text-align: center; margin-bottom: 22px; animation: fadeDown 0.8s ease-out backwards; }
+        .cab h1 {
+            font-size: 2.1rem; font-weight: 900; margin: 0 0 4px;
+            background: linear-gradient(to right, #6ee7b7, #34d399);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 20px rgba(52, 211, 153, 0.3));
+        }
+        .cab p { color: var(--text-muted); font-size: 0.78rem; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; margin: 0; }
+
+        /* El carné: blanco para que el lector lo lea bien desde la pantalla */
+        .carne {
+            background: #fff; color: #000; border-radius: 22px; padding: 18px 20px 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); margin-bottom: 10px; position: relative; overflow: hidden;
+        }
+        .carne::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px;
+            background: linear-gradient(to right, #34d399, #60a5fa);
+        }
+        .carne-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .carne-marca { font-size: 1.35rem; font-weight: 900; letter-spacing: 4px; line-height: 1; }
+        .carne-tipo { font-size: 0.6rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; color: #334155; }
+        .carne-logo { width: 62px; height: auto; flex-shrink: 0; }
+        .carne-nombre { font-size: 1.15rem; font-weight: 800; margin: 12px 0 10px; overflow-wrap: anywhere; }
+        .carne-barras svg { display: block; width: 100%; height: auto; max-height: 92px; }
+        .carne-barras rect { shape-rendering: crispEdges; }
+        .carne-codigo { font-family: 'Courier New', monospace; font-weight: 700; font-size: 1.25rem; letter-spacing: 4px; text-align: center; margin-top: 6px; }
+        .carne-hint { text-align: center; color: var(--text-muted); font-size: 0.7rem; font-weight: 600; margin-bottom: 22px; }
+
+        /* Tarjetas de información */
+        .bloque {
+            background: rgba(15, 15, 20, 0.55); border: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(20px); border-radius: 22px; padding: 20px; margin-bottom: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3); position: relative; overflow: hidden;
+        }
+        .bloque h2 { font-size: 0.95rem; margin: 0 0 4px; color: white; }
+        .bloque .sub { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin: 0 0 14px; line-height: 1.5; }
+        .bloque.cb { border-color: rgba(52, 211, 153, 0.25); background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(15,15,20,0.55)); }
+        .bloque.tor { border-color: rgba(96, 165, 250, 0.25); background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(15,15,20,0.55)); }
+
+        .saldo-lbl { font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+        .saldo { font-size: 2.8rem; font-weight: 900; color: #6ee7b7; line-height: 1.15; text-shadow: 0 0 30px rgba(52, 211, 153, 0.3); }
+        .mini { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.75rem; font-weight: 700; margin-top: 4px; }
+        .mini .g { color: #34d399; } .mini .s { color: #fca5a5; } .mini .c { color: var(--text-muted); }
+        .aviso { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; margin-top: 10px; }
+        .aviso.pronto { color: #fbbf24; }
+
+        .estado { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .estado .pill {
+            font-size: 0.65rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+            padding: 5px 11px; border-radius: 20px; background: rgba(0,0,0,0.35); color: #cbd5e1; flex-shrink: 0;
+        }
+        .estado .pill.on { color: #93c5fd; background: rgba(96, 165, 250, 0.15); border: 1px solid rgba(96, 165, 250, 0.35); }
+        .estado span:last-child { font-size: 0.78rem; color: #cbd5e1; font-weight: 600; }
+        .sellos { display: flex; gap: 7px; flex-wrap: wrap; margin: 4px 0 8px; }
+        .sello {
+            width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            border: 2px dashed rgba(255,255,255,0.15); font-size: 1.05rem;
+        }
+        .sello.on { border: 2px solid rgba(96, 165, 250, 0.6); background: rgba(96, 165, 250, 0.15); }
+        .premio-txt { font-size: 0.8rem; color: #cbd5e1; font-weight: 600; }
+        .premio-txt b { color: #93c5fd; }
+        .premio-ya {
+            margin-top: 10px; padding: 10px 14px; border-radius: 14px; font-weight: 800; font-size: 0.85rem; color: #1a1a2e;
+            background: linear-gradient(135deg, #fbbf24, #f59e0b); text-align: center;
+        }
+
+        .precio-fila {
+            display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 6px;
+            background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.04); border-radius: 12px;
+        }
+        .precio-prod { flex: 1; min-width: 0; color: white; font-weight: 600; font-size: 0.85rem; }
+        .precio-normal { color: var(--text-muted); text-decoration: line-through; font-size: 0.8rem; font-weight: 600; }
+        .precio-jug { color: #93c5fd; font-weight: 900; font-size: 1rem; }
+        .bloqueado .precio-jug { color: var(--text-muted); }
+
+        .tabs { display: flex; gap: 4px; background: rgba(0,0,0,0.4); border-radius: 14px; padding: 5px; margin-bottom: 12px; }
+        .tab {
+            flex: 1; padding: 9px 6px; border: none; border-radius: 10px; background: transparent; cursor: pointer;
+            color: var(--text-muted); font-family: 'Poppins', sans-serif; font-size: 0.78rem; font-weight: 600;
+        }
+        .tab.on { background: rgba(52, 211, 153, 0.15); color: #6ee7b7; }
+        .mv { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .mv:last-child { border-bottom: none; }
+        .mv-icon { width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; flex-shrink: 0; }
+        .mv-icon.ing { background: rgba(16, 185, 129, 0.15); } .mv-icon.gas { background: rgba(239, 68, 68, 0.15); }
+        .mv-icon.cad { background: rgba(148, 163, 184, 0.12); } .mv-icon.tor { background: rgba(96, 165, 250, 0.15); }
+        .mv-info { flex: 1; min-width: 0; }
+        .mv-concepto { font-size: 0.85rem; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mv-fecha { font-size: 0.7rem; color: var(--text-muted); font-weight: 600; margin-top: 1px; }
+        .mv-monto { font-weight: 800; font-size: 0.92rem; flex-shrink: 0; }
+        .mv-monto.pos { color: #34d399; } .mv-monto.neg { color: #fca5a5; } .mv-monto.cad { color: var(--text-muted); } .mv-monto.tor { color: #93c5fd; }
+        .vacio { text-align: center; color: var(--text-muted); font-size: 0.82rem; padding: 18px 10px; }
+
+        /* Instalar en el móvil */
+        .instalar summary {
+            cursor: pointer; list-style: none; font-weight: 700; font-size: 0.85rem; color: white;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .instalar summary::-webkit-details-marker { display: none; }
+        .instalar summary::after { content: '▾'; margin-left: auto; color: var(--text-muted); }
+        .instalar[open] summary::after { content: '▴'; }
+        .instalar p { color: #cbd5e1; font-size: 0.8rem; line-height: 1.6; margin: 12px 0 0; }
+        .instalar b { color: #6ee7b7; }
+
+        .estado-msg { text-align: center; padding: 60px 20px; animation: fadeUp 0.5s ease-out; }
+        .estado-msg .ico { font-size: 4rem; margin-bottom: 14px; }
+        .estado-msg h2 { color: white; font-size: 1.3rem; margin: 0 0 10px; justify-content: center; }
+        .estado-msg p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin: 0; }
+        .spin {
+            width: 46px; height: 46px; border: 4px solid rgba(255,255,255,0.1); border-top-color: #34d399;
+            border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .pie { text-align: center; color: #475569; font-size: 0.72rem; font-weight: 600; margin-top: 18px; }
+    </style>
+</head>
+<body>
+    <div class="bg-auras">
+        <div class="aura aura-1"></div>
+        <div class="aura aura-2"></div>
+        <div class="aura aura-3"></div>
+    </div>
+
+    <div class="wrap">
+        <div class="cab">
+            <h1>🐼 MI CARNÉ PANDA</h1>
+            <p>Cashback y torneos</p>
+        </div>
+        <div id="contenido">
+            <div class="estado-msg">
+                <div class="spin"></div>
+                <h2>Cargando tu carné...</h2>
+            </div>
+        </div>
+        <div class="pie">🐼 Panda Tools</div>
+    </div>
+
+<script>
+    // URL de la implementación de Apps Script (la misma que el wallet de la liga)
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywfB7iHCneKZE-_S5TdslmxKPuJm1cVwO_TwXK4vVImd74czpiPj5njWLG8Xftt7yOtA/exec';
+
+    const LOGO = `<svg class="carne-logo" viewBox="525 595 870 740" aria-hidden="true">
+        <path fill="#000" d="M612,832 C590,802 584,772 597,745 C614,706 645,692 685,692 C716,692 738,709 753,729 Z"/>
+        <path fill="#000" d="M1085,689 C1105,649 1140,621 1176,612 C1216,602 1262,608 1296,630 C1331,653 1353,692 1360,731 C1367,776 1349,816 1329,829 Z"/>
+        <ellipse cx="960" cy="1000" rx="423" ry="312" transform="rotate(-4 960 1000)" fill="#fff" stroke="#000" stroke-width="22"/>
+        <path fill="#000" d="M786,1021 C810,1015 822,996 820,980 C818,962 805,948 790,938 C770,926 750,928 732,934 C700,944 672,975 662,1010 C652,1045 660,1080 680,1097 C692,1108 704,1110 715,1108 C727,1104 737,1086 738,1076 C742,1045 744,1035 755,1028 C764,1023 776,1023 786,1021 Z"/>
+        <path fill="#000" d="M1020,999 C1050,996 1068,1018 1074,1045 C1080,1075 1082,1095 1100,1104 C1118,1112 1135,1104 1148,1090 C1165,1073 1178,1048 1178,1025 C1176,980 1158,935 1125,905 C1100,883 1070,872 1040,872 C1005,872 980,885 963,908 C945,932 938,952 952,975 C966,998 988,1004 1020,999 Z"/>
+        <path fill="#000" d="M860,1135 C860,1115 875,1111 895,1110 C910,1109 920,1118 927,1130 C935,1145 918,1163 896,1164 C876,1165 860,1155 860,1135 Z"/>
+    </svg>`;
+
+    // El código privado viene en el link (?c=...). Se recuerda en el móvil por si se abre sin él.
+    const params = new URLSearchParams(location.search);
+    let token = (params.get('c') || '').trim();
+    try {
+        if (token) localStorage.setItem('panda_carne', token);
+        else token = localStorage.getItem('panda_carne') || '';
+    } catch {}
+    // Que la dirección lleve siempre el código: así "Añadir a pantalla de inicio" guarda el carné correcto
+    if (token && !params.get('c')) history.replaceState(null, '', location.pathname + '?c=' + encodeURIComponent(token));
+
+    let datos = null;
+    let pestana = 'cashback';
+
+    if (!token) mensaje('🔗', 'Falta tu código', 'Escanea el QR de tu carné o pide tu link en la tienda.');
+    else cargar();
+
+    async function cargar() {
+        try {
+            const r = await fetch(`${SCRIPT_URL}?c=${encodeURIComponent(token)}`);
+            if (!r.ok) throw new Error('No se pudo conectar');
+            const d = await r.json();
+            if (d.error === 'no_encontrado') {
+                try { localStorage.removeItem('panda_carne'); } catch {}
+                mensaje('🤔', 'Carné no válido', 'Este link no corresponde a ningún carné o se ha renovado.<br>Pide tu link actualizado en la tienda.');
+                return;
+            }
+            if (d.error) throw new Error('El servidor no pudo leer tus datos');
+            datos = d;
+            pintar();
+        } catch (err) {
+            mensaje('⚠️', 'Error de conexión', esc(err.message) + '.<br><br>Comprueba tu conexión y vuelve a abrir la página.');
+        }
+    }
+
+    function pintar() {
+        const d = datos, j = d.jugador;
+        const legible = String(d.carne).replace(/(.{4})(?=.)/g, '$1 ');
+        const proximo = d.movimientos.filter(m => m.caduca && m.restante > 0)
+            .sort((a, b) => String(a.caduca).localeCompare(String(b.caduca)))[0];
+        const faltan = Math.max(0, j.meta - j.sellos);
+        const pct = String(d.cashback.porcentaje).replace('.', ',') + '%';
+
+        document.getElementById('contenido').innerHTML = `
+            <div class="carne">
+                <div class="carne-top">
+                    <div><div class="carne-marca">PANDA</div><div class="carne-tipo">Carné de cliente</div></div>
+                    ${LOGO}
+                </div>
+                <div class="carne-nombre">${esc(d.nombre)}</div>
+                <div class="carne-barras" id="barras"></div>
+                <div class="carne-codigo">${esc(legible)}</div>
+            </div>
+            <div class="carne-hint">📱 Enséñalo en caja y en los torneos · sube el brillo para escanearlo</div>
+
+            <div class="bloque cb">
+                <h2>💸 Tu saldo</h2>
+                <p class="sub">Cada compra de juegos de mesa te devuelve un ${pct} para gastar en juegos de mesa.</p>
+                <div class="saldo-lbl">Disponible</div>
+                <div class="saldo">${euros(d.saldo)}</div>
+                <div class="mini">
+                    <span class="g">+${euros(d.ganado)} ganados</span>
+                    <span class="s">-${euros(d.gastado)} gastados</span>
+                    ${d.caducado > 0 ? `<span class="c">⏳ ${euros(d.caducado)} caducados</span>` : ''}
+                </div>
+                ${proximo ? `<div class="aviso ${diasHasta(proximo.caduca) <= 30 ? 'pronto' : ''}">⏳ ${euros(proximo.restante)} de tu saldo caducan el ${fecha(proximo.caduca)}</div>` : ''}
+            </div>
+
+            <div class="bloque tor">
+                <h2>⚔️ Torneos</h2>
+                <p class="sub">Ficha con tu carné en cada torneo: cada uno es un sello y te da precio de jugador en TCG durante ${j.dias} días.</p>
+                <div class="estado">
+                    <span class="pill ${j.activo ? 'on' : ''}">${j.activo ? 'Jugador activo' : 'Inactivo'}</span>
+                    <span>${j.activo ? 'Precio de jugador hasta el ' + fecha(j.hasta) : j.ultima ? 'Último torneo el ' + fecha(j.ultima) : 'Aún no has jugado ningún torneo'}</span>
+                </div>
+                <div class="sellos">${sellos(j.sellos, j.meta)}</div>
+                <div class="premio-txt">${j.sellos >= j.meta
+                    ? `Tienes ${j.sellos} sellos`
+                    : `${j.sellos} de ${j.meta} sellos · te falta${faltan === 1 ? '' : 'n'} ${faltan} para: <b>${esc(j.premio)}</b>`}</div>
+                ${j.sellos >= j.meta ? `<div class="premio-ya">🎁 ¡Tienes premio! ${esc(j.premio)} · pídelo en la tienda</div>` : ''}
+            </div>
+
+            ${d.precios.length ? `
+            <div class="bloque tor ${j.activo ? '' : 'bloqueado'}">
+                <h2>🃏 Precios de jugador</h2>
+                <p class="sub">${j.activo ? 'Tienes estos precios en TCG hasta el ' + fecha(j.hasta) + '.' : '🔒 Juega un torneo para desbloquear estos precios.'}</p>
+                ${d.precios.map(p => `
+                    <div class="precio-fila">
+                        <span class="precio-prod">${esc(p.producto)}</span>
+                        ${p.precio > 0 ? `<span class="precio-normal">${euros(p.precio)}</span>` : ''}
+                        <span class="precio-jug">${euros(p.precio_jugador)}</span>
+                    </div>`).join('')}
+            </div>` : ''}
+
+            <div class="bloque">
+                <h2 style="margin-bottom: 12px">📋 Historial</h2>
+                <div class="tabs">
+                    <button class="tab ${pestana === 'cashback' ? 'on' : ''}" onclick="verPestana('cashback')">💸 Saldo</button>
+                    <button class="tab ${pestana === 'torneos' ? 'on' : ''}" onclick="verPestana('torneos')">⚔️ Torneos</button>
+                </div>
+                <div id="historial">${historial()}</div>
+            </div>
+
+            <details class="bloque instalar">
+                <summary>📲 Guarda tu carné en el móvil</summary>
+                <p><b>iPhone (Safari):</b> pulsa el botón Compartir y elige «Añadir a pantalla de inicio».</p>
+                <p><b>Android (Chrome):</b> pulsa los tres puntos ⋮ y elige «Añadir a pantalla de inicio» o «Instalar».</p>
+                <p>Te aparecerá el panda en el móvil y se abrirá directamente tu carné, siempre actualizado.</p>
+            </details>`;
+
+        try {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            JsBarcode(svg, d.carne, { format: 'CODE128', width: 2, height: 80, margin: 10, displayValue: false, background: '#ffffff', lineColor: '#000000' });
+            document.getElementById('barras').appendChild(svg);
+        } catch {
+            document.getElementById('barras').innerHTML = '';
+        }
+    }
+
+    function verPestana(p) {
+        pestana = p;
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.textContent.includes(p === 'cashback' ? 'Saldo' : 'Torneos')));
+        document.getElementById('historial').innerHTML = historial();
+    }
+
+    function historial() {
+        if (pestana === 'torneos') {
+            const h = datos.jugador.historial;
+            if (!h.length) return '<div class="vacio">Todavía no has fichado en ningún torneo</div>';
+            return h.map(a => `
+                <div class="mv">
+                    <div class="mv-icon ${a.tipo === 'premio' ? 'gas' : 'tor'}">${a.tipo === 'premio' ? '🎁' : '⚔️'}</div>
+                    <div class="mv-info">
+                        <div class="mv-concepto">${a.tipo === 'premio' ? 'Premio: ' + esc(a.torneo) : esc(a.torneo || 'Torneo')}</div>
+                        <div class="mv-fecha">${fecha(a.fecha)}</div>
+                    </div>
+                    <div class="mv-monto ${a.tipo === 'premio' ? 'neg' : 'tor'}">${a.tipo === 'premio' ? '-' + a.sellos : '+1'} 🐼</div>
+                </div>`).join('');
+        }
+        const movs = [...datos.movimientos].sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+        if (!movs.length) return '<div class="vacio">Todavía no tienes movimientos</div>';
+        return movs.map(m => {
+            const ing = m.tipo === 'cashback' || m.tipo === 'ingreso' || m.tipo === 'premio';
+            const cad = m.tipo === 'caducado';
+            let caduca = '';
+            if (m.caduca && m.restante > 0) {
+                caduca = ' · ' + (m.restante < m.monto ? `te quedan ${euros(m.restante)}, caducan el ${fecha(m.caduca)}` : `caduca el ${fecha(m.caduca)}`);
+            }
+            return `
+                <div class="mv">
+                    <div class="mv-icon ${ing ? 'ing' : cad ? 'cad' : 'gas'}">${ing ? '💸' : cad ? '⏳' : '🛒'}</div>
+                    <div class="mv-info">
+                        <div class="mv-concepto">${esc(m.concepto || '—')}</div>
+                        <div class="mv-fecha">${fecha(m.fecha)}${caduca}</div>
+                    </div>
+                    <div class="mv-monto ${ing ? 'pos' : cad ? 'cad' : 'neg'}">${ing ? '+' : '-'}${euros(m.monto)}</div>
+                </div>`;
+        }).join('');
+    }
+
+    function sellos(n, meta) {
+        let h = '';
+        for (let i = 0; i < meta; i++) h += `<span class="sello ${i < n ? 'on' : ''}">${i < n ? '🐼' : ''}</span>`;
+        return h;
+    }
+
+    function mensaje(ico, titulo, texto) {
+        document.getElementById('contenido').innerHTML = `
+            <div class="estado-msg"><div class="ico">${ico}</div><h2>${titulo}</h2><p>${texto}</p></div>`;
+    }
+
+    function euros(n) { return (Number(n) || 0).toFixed(2).replace('.', ',') + '€'; }
+    function fecha(s) {
+        const d = new Date(s);
+        return isNaN(d) ? String(s || '') : d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    function diasHasta(s) {
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+        return Math.round((new Date(s) - hoy) / 86400000);
+    }
+    function esc(s) {
+        return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+</script>
+</body>
+</html>
