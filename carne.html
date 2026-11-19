@@ -54,6 +54,48 @@
         .carne-codigo { font-family: 'Courier New', monospace; font-weight: 700; font-size: 1.25rem; letter-spacing: 4px; text-align: center; margin-top: 6px; }
         .carne-hint { text-align: center; color: var(--text-muted); font-size: 0.7rem; font-weight: 600; margin-bottom: 22px; }
 
+        /* ===== CARNÉ HOLOGRÁFICO (ESTILO_CARNE = 'holo') =====
+           Se inclina en 3D y lleva brillo foil. Con 'clasico' se usa el carné blanco de arriba tal cual. */
+        .escena-carne { perspective: 900px; margin-bottom: 10px; }
+        .carne.holo {
+            --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 50%; --fx: 50%; --fy: 50%; --brillo: 0.6;
+            margin-bottom: 0; transform: rotateX(var(--rx)) rotateY(var(--ry)); transform-style: preserve-3d;
+            transition: transform 0.12s ease-out; will-change: transform;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 35%, #f1f5f9 55%, #cbd5e1 100%);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.4) inset;
+        }
+        .carne.holo.suelta { transition: transform 0.6s cubic-bezier(.2,.8,.2,1); }
+        .carne.holo::before { display: none; }
+        .carne.holo .holo-capa { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+        .carne.holo .holo-foil {
+            background: repeating-linear-gradient(115deg,
+                hsl(0 100% 75%) 0%, hsl(45 100% 70%) 6%, hsl(110 90% 72%) 12%,
+                hsl(185 95% 72%) 18%, hsl(250 95% 78%) 24%, hsl(310 95% 78%) 30%, hsl(360 100% 75%) 36%);
+            background-size: 300% 300%; background-position: var(--fx) var(--fy);
+            mix-blend-mode: multiply; opacity: calc(var(--brillo) * 0.55);
+        }
+        .carne.holo .holo-purpurina {
+            opacity: calc(var(--brillo) * 0.5); mix-blend-mode: overlay;
+            background-image:
+                radial-gradient(circle at 20% 30%, rgba(255,255,255,0.9) 0 1px, transparent 1.5px),
+                radial-gradient(circle at 70% 60%, rgba(255,255,255,0.9) 0 1px, transparent 1.5px),
+                radial-gradient(circle at 40% 80%, rgba(255,255,255,0.8) 0 1px, transparent 1.5px);
+            background-size: 23px 23px, 31px 31px, 17px 17px;
+        }
+        .carne.holo .holo-destello {
+            background: radial-gradient(circle at var(--mx) var(--my), rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.25) 22%, transparent 50%);
+            mix-blend-mode: soft-light; opacity: var(--brillo);
+        }
+        .carne.holo .carne-contenido { position: relative; z-index: 2; transform: translateZ(30px); }
+        /* El código de barras va en blanco y sin brillo encima: el lector lo lee siempre */
+        .carne.holo .carne-barras { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 0 rgba(0,0,0,0.06); }
+        .carne.holo .carne-codigo { font-family: inherit; font-variant-numeric: tabular-nums; }
+        .btn-giro {
+            display: block; margin: 0 auto 18px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+            color: white; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.8rem; padding: 9px 14px; border-radius: 11px;
+        }
+        @media (prefers-reduced-motion: reduce) { .carne.holo { transform: none !important; } }
+
         /* Tarjetas de información */
         .bloque {
             background: rgba(15, 15, 20, 0.55); border: 1px solid rgba(255,255,255,0.06);
@@ -169,6 +211,9 @@
     // URL de la implementación de Apps Script (la misma que el wallet de la liga)
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbywfB7iHCneKZE-_S5TdslmxKPuJm1cVwO_TwXK4vVImd74czpiPj5njWLG8Xftt7yOtA/exec';
 
+    // Aspecto del carné: 'holo' (holográfico, se mueve y brilla) o 'clasico' (el carné blanco de antes)
+    const ESTILO_CARNE = 'holo';
+
     const LOGO = `<svg class="carne-logo" viewBox="525 595 870 740" aria-hidden="true">
         <path fill="#000" d="M612,832 C590,802 584,772 597,745 C614,706 645,692 685,692 C716,692 738,709 753,729 Z"/>
         <path fill="#000" d="M1085,689 C1105,649 1140,621 1176,612 C1216,602 1262,608 1296,630 C1331,653 1353,692 1360,731 C1367,776 1349,816 1329,829 Z"/>
@@ -221,16 +266,29 @@
         const faltan = Math.max(0, j.meta - j.sellos);
         const pct = String(d.cashback.porcentaje).replace('.', ',') + '%';
 
-        document.getElementById('contenido').innerHTML = `
-            <div class="carne">
+        const holo = ESTILO_CARNE === 'holo';
+        const datosCarne = `
                 <div class="carne-top">
                     <div><div class="carne-marca">PANDA</div><div class="carne-tipo">Carné de cliente</div></div>
                     ${LOGO}
                 </div>
                 <div class="carne-nombre">${esc(d.nombre)}</div>
                 <div class="carne-barras" id="barras"></div>
-                <div class="carne-codigo">${esc(legible)}</div>
-            </div>
+                <div class="carne-codigo">${esc(legible)}</div>`;
+        const carneHTML = holo
+            ? `<div class="escena-carne" id="escenaCarne">
+                <div class="carne holo" id="carneHolo">
+                    <div class="holo-capa holo-foil"></div>
+                    <div class="holo-capa holo-purpurina"></div>
+                    <div class="holo-capa holo-destello"></div>
+                    <div class="carne-contenido">${datosCarne}</div>
+                </div>
+              </div>
+              <button class="btn-giro" id="btnGiro" hidden>📱 Mover el carné al inclinar el móvil</button>`
+            : `<div class="carne">${datosCarne}</div>`;
+
+        document.getElementById('contenido').innerHTML = `
+            ${carneHTML}
             <div class="carne-hint">📱 Enséñalo en caja y en los torneos · sube el brillo para escanearlo</div>
 
             <div class="bloque cb">
@@ -294,6 +352,79 @@
             document.getElementById('barras').appendChild(svg);
         } catch {
             document.getElementById('barras').innerHTML = '';
+        }
+        if (holo) activarHolo();
+    }
+
+    // ---- Movimiento del carné holográfico ----
+    let holoInteractuando = false, holoTiempo = 0, holoUltimoGiro = 0, holoEnMarcha = false, holoGiroActivo = false;
+
+    // px, py entre 0 y 1: hacia dónde "mira" el carné
+    function holoInclinar(px, py, brillo) {
+        const c = document.getElementById('carneHolo');
+        if (!c) return;
+        px = Math.min(1, Math.max(0, px)); py = Math.min(1, Math.max(0, py));
+        c.style.setProperty('--ry', ((px - 0.5) * 22).toFixed(2) + 'deg');
+        c.style.setProperty('--rx', ((0.5 - py) * 18).toFixed(2) + 'deg');
+        c.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+        c.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+        c.style.setProperty('--fx', (20 + px * 60).toFixed(1) + '%');
+        c.style.setProperty('--fy', (20 + py * 60).toFixed(1) + '%');
+        c.style.setProperty('--brillo', brillo);
+    }
+
+    function holoGiro(e) {
+        if (e.gamma == null) return;
+        holoUltimoGiro = Date.now();
+        // gamma: izquierda/derecha; beta: adelante/atrás (el móvil se sujeta a unos 45º)
+        holoInclinar(0.5 + e.gamma / 60, 0.5 + (e.beta - 45) / 60, 0.9);
+    }
+
+    function activarHolo() {
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const escena = document.getElementById('escenaCarne');
+        const carne = document.getElementById('carneHolo');
+        escena.addEventListener('pointermove', e => {
+            const r = carne.getBoundingClientRect();
+            holoInteractuando = true;
+            carne.classList.remove('suelta');
+            holoInclinar((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, 1);
+        });
+        escena.addEventListener('pointerleave', () => { holoInteractuando = false; carne.classList.add('suelta'); });
+
+        // Giroscopio: en iPhone hay que pedir permiso con un toque; en Android va directo
+        if (typeof DeviceOrientationEvent !== 'undefined' && !holoGiroActivo) {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                const b = document.getElementById('btnGiro');
+                b.hidden = false;
+                b.onclick = async () => {
+                    try {
+                        if (await DeviceOrientationEvent.requestPermission() === 'granted') {
+                            window.addEventListener('deviceorientation', holoGiro);
+                            holoGiroActivo = true;
+                            b.hidden = true;
+                        }
+                    } catch {}
+                };
+            } else {
+                window.addEventListener('deviceorientation', holoGiro);
+                holoGiroActivo = true;
+            }
+        } else if (holoGiroActivo) {
+            document.getElementById('btnGiro').hidden = true;
+        }
+
+        // Balanceo suave mientras nadie lo toca
+        if (!holoEnMarcha) {
+            holoEnMarcha = true;
+            const paso = () => {
+                holoTiempo += 0.012;
+                if (!holoInteractuando && Date.now() - holoUltimoGiro > 1500) {
+                    holoInclinar(0.5 + Math.sin(holoTiempo) * 0.22, 0.5 + Math.cos(holoTiempo * 0.8) * 0.16, 0.6);
+                }
+                requestAnimationFrame(paso);
+            };
+            requestAnimationFrame(paso);
         }
     }
 
